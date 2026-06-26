@@ -299,3 +299,4 @@ export function setup(ctx: any) {
 
   return () => { lb.remove(); tab.destroy(); };
 }
+(window as any).setup = setup;
