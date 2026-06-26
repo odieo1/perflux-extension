@@ -1,0 +1,11 @@
+{
+  "name": "perflux-extension",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "bun build src/frontend.ts --outdir dist --target browser --minify",
+    "dev": "bun build src/frontend.ts --outdir dist --target browser --watch"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  }
+}

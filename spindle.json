@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "name": "PerFlux",
+  "identifier": "perflux",
+  "author": "Dustin Odom",
+  "github": "https://github.com/odieo1/perflux-extension",
+  "homepage": "https://github.com/odieo1/perflux-extension",
+  "description": "Image generation via Pollinations AI with a Perchance-style gallery.",
+  "permissions": [],
+  "entry_backend": null,
+  "entry_frontend": "dist/frontend.js",
+  "minimum_lumiverse_version": "1.0.0"
+}
