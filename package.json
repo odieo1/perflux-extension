@@ -2,10 +2,17 @@
   "name": "perflux-extension",
   "version": "1.0.0",
   "scripts": {
-    "build": "bun build src/frontend.ts --outdir dist --target browser --format iife --minify",
-    "dev": "bun build src/frontend.ts --outdir dist --target browser --format iife --watch"
+    "build": "bun build src/frontend.ts --outdir dist --target browser --format esm --minify && bun build src/backend.ts --outdir dist --target bun --minify",
+    "dev": "bun build src/frontend.ts --outdir dist --target browser --format esm --watch"
   },
   "devDependencies": {
-    "bun-types": "latest"
+    "bun-types": "latest",
+    "lumiverse-spindle-types": "latest"
   }
 }
+
+
+
+
+
+
