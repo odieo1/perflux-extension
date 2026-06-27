@@ -57,6 +57,20 @@ export function setup(ctx: any) {
       color:#e05a5a;font-size:11px;font-weight:600;padding:4px 8px;
       cursor:pointer;font-family:inherit;white-space:nowrap}
     .pf-key-set-btn:hover{background:rgba(224,90,90,.35)}
+    .pf-key-form{display:none;flex-direction:column;gap:8px;padding:10px 12px;
+      border-radius:8px;border:1px solid var(--lumiverse-border,rgba(255,255,255,.12));
+      background:var(--lumiverse-fill-subtle,rgba(255,255,255,.05))}
+    .pf-key-form.visible{display:flex}
+    .pf-key-input{width:100%;border-radius:6px;padding:8px 10px;box-sizing:border-box;
+      border:1px solid var(--lumiverse-border,rgba(255,255,255,.12));
+      background:var(--lumiverse-bg,#1a1a1a);
+      color:var(--lumiverse-text,#e0e0e0);font-size:13px;font-family:inherit}
+    .pf-key-input:focus{outline:none;border-color:var(--lumiverse-accent,#5a9fd4)}
+    .pf-key-save{padding:8px 12px;border-radius:6px;border:none;
+      background:var(--lumiverse-accent,#5a9fd4);color:#fff;font-size:13px;
+      font-weight:600;cursor:pointer;font-family:inherit;
+      transition:background 160ms ease}
+    .pf-key-save:hover{background:var(--lumiverse-accent-hover,#4889bc)}
     .pf-btn{width:100%;padding:11px 16px;border-radius:8px;border:none;
       background:var(--lumiverse-accent,#5a9fd4);color:#fff;font-size:14px;
       font-weight:600;cursor:pointer;font-family:inherit;
@@ -131,6 +145,7 @@ export function setup(ctx: any) {
   ctx.onBackendMessage((payload: any) => {
     if (payload.type === "perflux_key_saved") {
       keyBanner.classList.remove("visible");
+      keyForm.classList.remove("visible");
       return;
     }
     if (payload.id && pending.has(payload.id)) {
@@ -175,24 +190,40 @@ export function setup(ctx: any) {
   keyBanner.innerHTML = `<span>No Pollinations API key set — images won't generate.</span>`;
   const keySetBtn = el("button", "pf-key-set-btn", "Set Key", "");
   keyBanner.appendChild(keySetBtn);
+  keyBanner.classList.add("visible");
 
-  async function promptForKey() {
-    const result = await ctx.prompt.input({
-      title: "Pollinations API Key",
-      message: "Enter your Pollinations SK key. It stays in backend memory and is never stored on disk.",
-      placeholder: "sk_xxxxxxxxxxxxxxxx",
-      submitLabel: "Save Key",
-    });
-    if (!result.cancelled && result.value) {
-      ctx.sendToBackend({ type: "perflux_set_key", key: result.value.trim() });
-    }
+  // ── Inline key form ───────────────────────────────────────────────────────
+  const keyForm = el("div", "pf-key-form", "", "");
+  keyForm.appendChild(el("div", "pf-label", "Pollinations SK Key", ""));
+  const keyInput: any = el("input", "pf-key-input", "", "");
+  keyInput.type = "password";
+  keyInput.placeholder = "sk_xxxxxxxxxxxxxxxx";
+  keyInput.setAttribute("aria-label", "Pollinations API key");
+  const keySubmit = el("button", "pf-key-save", "Save Key", "");
+  keyForm.appendChild(keyInput);
+  keyForm.appendChild(keySubmit);
+
+  function toggleKeyForm() {
+    const isVisible = keyForm.classList.contains("visible");
+    keyForm.classList.toggle("visible");
+    if (!isVisible) setTimeout(() => keyInput.focus(), 50);
   }
 
-  settingsBtn.addEventListener("click", promptForKey);
-  keySetBtn.addEventListener("click", promptForKey);
+  function saveKey() {
+    const key = keyInput.value.trim();
+    if (!key) return;
+    ctx.sendToBackend({ type: "perflux_set_key", key });
+    keyInput.value = "";
+    keyForm.classList.remove("visible");
+    keyBanner.classList.remove("visible");
+  }
 
-  // Show banner on load until key is confirmed saved
-  keyBanner.classList.add("visible");
+  settingsBtn.addEventListener("click", toggleKeyForm);
+  keySetBtn.addEventListener("click", toggleKeyForm);
+  keySubmit.addEventListener("click", saveKey);
+  keyInput.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter") saveKey();
+  });
 
   // ── UI Elements ───────────────────────────────────────────────────────────
   const promptLabel = el("div", "pf-label", "Prompt", "");
@@ -246,7 +277,7 @@ export function setup(ctx: any) {
   galHdr.style.display = "none";
   const gallery  = el("div", "pf-gallery", "", "");
 
-  [topRow, keyBanner, promptLabel, promptTA, negLabel, negTA, row,
+  [topRow, keyBanner, keyForm, promptLabel, promptTA, negLabel, negTA, row,
    genBtn, statusEl, divider, galHdr, gallery]
     .forEach((n: any) => root.appendChild(n));
   tab.root.appendChild(root);
