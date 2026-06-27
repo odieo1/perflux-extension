@@ -41,6 +41,22 @@ export function setup(ctx: any) {
       background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
       background-repeat:no-repeat;background-position:right 10px center}
     .pf-select:focus{outline:none;border-color:var(--lumiverse-accent,#5a9fd4)}
+    .pf-top-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .pf-title{font-size:15px;font-weight:700;color:var(--lumiverse-text,#e0e0e0)}
+    .pf-settings-btn{background:none;border:1px solid var(--lumiverse-border,rgba(255,255,255,.12));
+      border-radius:6px;padding:5px 8px;cursor:pointer;color:var(--lumiverse-text-dim,#888);
+      display:flex;align-items:center;gap:5px;font-size:12px;font-family:inherit;
+      transition:border-color 160ms,color 160ms}
+    .pf-settings-btn:hover{border-color:var(--lumiverse-accent,#5a9fd4);
+      color:var(--lumiverse-accent,#5a9fd4)}
+    .pf-key-banner{font-size:12px;padding:9px 12px;border-radius:7px;
+      background:rgba(224,90,90,.12);border:1px solid rgba(224,90,90,.25);
+      color:#e05a5a;display:none;align-items:center;justify-content:space-between;gap:8px}
+    .pf-key-banner.visible{display:flex}
+    .pf-key-set-btn{background:rgba(224,90,90,.2);border:none;border-radius:5px;
+      color:#e05a5a;font-size:11px;font-weight:600;padding:4px 8px;
+      cursor:pointer;font-family:inherit;white-space:nowrap}
+    .pf-key-set-btn:hover{background:rgba(224,90,90,.35)}
     .pf-btn{width:100%;padding:11px 16px;border-radius:8px;border:none;
       background:var(--lumiverse-accent,#5a9fd4);color:#fff;font-size:14px;
       font-weight:600;cursor:pointer;font-family:inherit;
@@ -93,9 +109,6 @@ export function setup(ctx: any) {
       color:#fff;font-size:28px;cursor:pointer;line-height:1;
       opacity:.75;transition:opacity 140ms}
     .pf-lb-close:hover{opacity:1}
-    .pf-retry{font-size:11px;color:var(--lumiverse-accent,#5a9fd4);
-      background:none;border:none;cursor:pointer;padding:4px 0;
-      text-decoration:underline;width:100%;text-align:center}
   `;
   tab.root.appendChild(style);
 
@@ -111,6 +124,75 @@ export function setup(ctx: any) {
   }
 
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  // ── Pending promise map for backend responses ─────────────────────────────
+  const pending = new Map<string, { resolve: (v: any) => void; reject: (e: any) => void }>();
+
+  ctx.onBackendMessage((payload: any) => {
+    if (payload.type === "perflux_key_saved") {
+      keyBanner.classList.remove("visible");
+      return;
+    }
+    if (payload.id && pending.has(payload.id)) {
+      const { resolve, reject } = pending.get(payload.id)!;
+      pending.delete(payload.id);
+      if (payload.error) reject(new Error(payload.error));
+      else resolve(payload.dataUrl);
+    }
+  });
+
+  function requestImage(prompt: string, neg: string, style: string, seed: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const id = `pf_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      pending.set(id, { resolve, reject });
+      ctx.sendToBackend({ type: "perflux_generate", id, prompt, neg, style, seed });
+    });
+  }
+
+  // ── Top row: title + settings button ─────────────────────────────────────
+  const topRow = el("div", "pf-top-row", "", "");
+  topRow.appendChild(el("div", "pf-title", "PerFlux", ""));
+  const settingsBtn = el("button", "pf-settings-btn", "", `
+    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06
+               a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09
+               A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83
+               l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+               A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83
+               l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
+               a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83
+               l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
+               a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg> API Key`);
+  settingsBtn.setAttribute("aria-label", "Set API key");
+  topRow.appendChild(settingsBtn);
+
+  // ── Key missing banner ────────────────────────────────────────────────────
+  const keyBanner = el("div", "pf-key-banner", "", "");
+  keyBanner.innerHTML = `<span>No Pollinations API key set — images won't generate.</span>`;
+  const keySetBtn = el("button", "pf-key-set-btn", "Set Key", "");
+  keyBanner.appendChild(keySetBtn);
+
+  async function promptForKey() {
+    const result = await ctx.prompt.input({
+      title: "Pollinations API Key",
+      message: "Enter your Pollinations SK key. It stays in backend memory and is never stored on disk.",
+      placeholder: "sk_xxxxxxxxxxxxxxxx",
+      submitLabel: "Save Key",
+    });
+    if (!result.cancelled && result.value) {
+      ctx.sendToBackend({ type: "perflux_set_key", key: result.value.trim() });
+    }
+  }
+
+  settingsBtn.addEventListener("click", promptForKey);
+  keySetBtn.addEventListener("click", promptForKey);
+
+  // Show banner on load until key is confirmed saved
+  keyBanner.classList.add("visible");
 
   // ── UI Elements ───────────────────────────────────────────────────────────
   const promptLabel = el("div", "pf-label", "Prompt", "");
@@ -164,7 +246,7 @@ export function setup(ctx: any) {
   galHdr.style.display = "none";
   const gallery  = el("div", "pf-gallery", "", "");
 
-  [promptLabel, promptTA, negLabel, negTA, row,
+  [topRow, keyBanner, promptLabel, promptTA, negLabel, negTA, row,
    genBtn, statusEl, divider, galHdr, gallery]
     .forEach((n: any) => root.appendChild(n));
   tab.root.appendChild(root);
@@ -186,41 +268,12 @@ export function setup(ctx: any) {
   lb.addEventListener("click", closeLB);
   document.addEventListener("keydown", (e: any) => { if (e.key === "Escape") closeLB(); });
 
-  // ── Pollinations URL builder (gen.pollinations.ai) ────────────────────────
-  const PK = "pk_VveVFnRrYLAxuVzS";
-  const BASE = "https://gen.pollinations.ai/image/";
-
-  function buildUrl(prompt: string, neg: string, style: string, seed: number): string {
-    const suffix = style === "anime"
-      ? ", anime style, vibrant anime illustration, cel shaded"
-      : ", ultra-realistic, photorealistic, 8k uhd, highly detailed";
-    const fullPrompt = prompt.trim() + suffix;
-    const p = new URLSearchParams({
-      model:  "flux",
-      width:  "768",
-      height: "768",
-      seed:   String(seed),
-      nologo: "true",
-      key:    PK,
-    });
-    if (neg.trim()) p.set("negative_prompt", neg.trim());
-    return `${BASE}${encodeURIComponent(fullPrompt)}?${p}`;
-  }
-
-  // ── Fetch image as blob to bypass any CSP on <img> src ───────────────────
-  async function fetchImageBlob(url: string): Promise<string> {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const blob = await resp.blob();
-    return URL.createObjectURL(blob);
-  }
-
   // ── Card factory ──────────────────────────────────────────────────────────
-  function makeCard(blobUrl: string, promptText: string, idx: number): HTMLElement {
+  function makeCard(dataUrl: string, promptText: string, idx: number): HTMLElement {
     const card = el("div", "pf-card", "", "");
     const img: any = el("img", "", "", "");
     img.alt = `Generated image ${idx + 1}`;
-    img.src = blobUrl;
+    img.src = dataUrl;
     card.appendChild(img);
 
     const overlay = el("div", "pf-overlay", "", "");
@@ -238,21 +291,20 @@ export function setup(ctx: any) {
     dlBtn.addEventListener("click", (e: any) => {
       e.stopPropagation();
       const a = document.createElement("a");
-      a.href = blobUrl;
+      a.href = dataUrl;
       a.download = `perflux-${Date.now()}-${idx + 1}.png`;
       a.click();
     });
     overlay.appendChild(lbl); overlay.appendChild(dlBtn);
     card.appendChild(overlay);
-    card.addEventListener("click", () => openLB(blobUrl));
+    card.addEventListener("click", () => openLB(dataUrl));
     return card;
   }
 
   // ── Skeleton card placeholder ─────────────────────────────────────────────
   function makeSkeleton(): HTMLElement {
     const card = el("div", "pf-card", "", "");
-    const skel = el("div", "pf-skeleton", "", "");
-    card.appendChild(skel);
+    card.appendChild(el("div", "pf-skeleton", "", ""));
     return card;
   }
 
@@ -263,16 +315,15 @@ export function setup(ctx: any) {
       statusEl.textContent = "Please enter a prompt before generating.";
       statusEl.className = "pf-status error"; promptTA.focus(); return;
     }
-    const count  = parseInt(countSel.value, 10);
-    const style  = styleSel.value;
-    const neg    = negTA.value;
+    const count = parseInt(countSel.value, 10);
+    const style = styleSel.value;
+    const neg   = negTA.value;
 
     genBtn.disabled = true;
     statusEl.className = "pf-status";
     statusEl.textContent = `Generating ${count} image${count > 1 ? "s" : ""}…`;
     galHdr.style.display = "block";
 
-    // Insert skeleton placeholders immediately
     const skeletons: HTMLElement[] = [];
     for (let i = 0; i < count; i++) {
       const sk = makeSkeleton();
@@ -284,20 +335,16 @@ export function setup(ctx: any) {
     const seed0 = Date.now();
     let ok = 0;
 
-    // Stagger requests 800ms apart, fetch as blob
     const tasks = Array.from({ length: count }, (_, i) =>
       sleep(i * 800).then(async () => {
-        const url = buildUrl(promptVal, neg, style, seed0 + i * 1000);
         try {
-          const blobUrl = await fetchImageBlob(url);
-          const card = makeCard(blobUrl, promptVal, i);
-          // Replace the corresponding skeleton
+          const dataUrl = await requestImage(promptVal, neg, style, seed0 + i * 1000);
+          const card = makeCard(dataUrl, promptVal, i);
           const sk = skeletons[i];
           if (sk && sk.parentNode) sk.parentNode.replaceChild(card, sk);
           ok++;
           statusEl.textContent = `✓ ${ok} / ${count} complete…`;
-        } catch (err) {
-          // Replace skeleton with error state
+        } catch (err: any) {
           const sk = skeletons[i];
           if (sk) {
             const errEl = el("div", "", "⚠ Failed", "");
@@ -315,7 +362,7 @@ export function setup(ctx: any) {
     statusEl.textContent = ok === count
       ? `✓ ${count} image${count > 1 ? "s" : ""} generated.`
       : ok === 0
-        ? "All failed — check your API key or try again shortly."
+        ? "All failed — check your API key or try again."
         : `${ok} of ${count} succeeded.`;
   });
 

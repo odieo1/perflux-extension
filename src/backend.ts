@@ -1,6 +1,9 @@
 declare const spindle: import('lumiverse-spindle-types').SpindleAPI
 
-const BASE = "https://gen.pollinations.ai/image/"
+const BASE = "https://image.pollinations.ai/prompt/"
+
+// Key stored in memory — user sets it once via spindle.prompt.input()
+let apiKey = ""
 
 function buildUrl(prompt: string, neg: string, style: string, seed: number): string {
   const suffix = style === "anime"
@@ -12,27 +15,34 @@ function buildUrl(prompt: string, neg: string, style: string, seed: number): str
     height: "768",
     seed:   String(seed),
     nologo: "true",
-    key:    process.env.POLLINATIONS_API ?? "",
+    key:    apiKey,
   })
   if (neg.trim()) p.set("negative_prompt", neg.trim())
   return `${BASE}${encodeURIComponent(prompt.trim() + suffix)}?${p}`
 }
 
-spindle.on("frontend_message", async (payload: any) => {
+spindle.onFrontendMessage(async (payload: any, userId: string) => {
+  if (payload.type === "perflux_set_key") {
+    apiKey = payload.key ?? ""
+    spindle.sendToFrontend({ type: "perflux_key_saved" }, userId)
+    return
+  }
+
   if (payload.type !== "perflux_generate") return
 
   const { id, prompt, neg, style, seed } = payload
 
+  if (!apiKey) {
+    spindle.sendToFrontend({ id, error: "No API key set. Use the settings button to enter your Pollinations key." }, userId)
+    return
+  }
+
   try {
     const url = buildUrl(prompt, neg ?? "", style ?? "ultra-realistic", seed ?? Date.now())
-
-    const response = await spindle.corsProxy.fetch(url, {
-      method: "GET",
-      headers: { "Accept": "image/*" },
-    })
+    const response = await spindle.cors(url, { method: "GET", headers: { "Accept": "image/*" } }) as Response
 
     if (!response.ok) {
-      spindle.sendToFrontend({ id, error: `HTTP ${response.status}: ${response.statusText}` })
+      spindle.sendToFrontend({ id, error: `HTTP ${response.status}: ${response.statusText}` }, userId)
       return
     }
 
@@ -44,10 +54,10 @@ spindle.on("frontend_message", async (payload: any) => {
     const contentType = response.headers.get("content-type") ?? "image/png"
     const dataUrl = `data:${contentType};base64,${b64}`
 
-    spindle.sendToFrontend({ id, dataUrl })
+    spindle.sendToFrontend({ id, dataUrl }, userId)
 
   } catch (err: any) {
-    spindle.sendToFrontend({ id, error: err?.message ?? "Unknown error" })
+    spindle.sendToFrontend({ id, error: err?.message ?? "Unknown error" }, userId)
   }
 })
 
