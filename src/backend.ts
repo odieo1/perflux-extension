@@ -12,7 +12,7 @@ function buildUrl(prompt: string, neg: string, style: string, seed: number): str
     height: "768",
     seed:   String(seed),
     nologo: "true",
-    key:    process.env.POLLINATIONS_API_KEY ?? "",
+    key:    process.env.POLLINATIONS_API ?? "",
   })
   if (neg.trim()) p.set("negative_prompt", neg.trim())
   return `${BASE}${encodeURIComponent(prompt.trim() + suffix)}?${p}`
